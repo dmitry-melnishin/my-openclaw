@@ -29,12 +29,29 @@ Personal AI assistant: multi-channel gateway with LLM agent engine.
 ## Project Structure
 
 ```
-src/           — all source code (entry: src/index.ts)
-dist/          — build output (gitignored)
+src/
+├── config/                    — Config layer (Sprint 1.1 ✅)
+│   ├── schema.ts              — Zod strict schemas (MyClawConfig, AuthProfile, Provider, etc.)
+│   ├── loader.ts              — loadConfig(): JSON5 → env sub → Zod validate → defaults → 200ms cache
+│   ├── paths.ts               — ~/.myclaw/ directory resolution, env overrides (MYCLAW_STATE_DIR, etc.)
+│   ├── defaults.ts            — Immutable defaults chain: gateway → agent → logging
+│   ├── env-substitution.ts    — ${VAR} substitution, $${VAR} escape, MissingEnvVarError
+│   └── index.ts               — Barrel re-export
+dist/                          — build output (gitignored)
 ```
 
 - **Co-located tests:** place test files next to source as `*.test.ts` (they are excluded from `tsconfig` compilation but picked up by Vitest)
 - **Environment variables:** use `.env` files (gitignored); commit `.env.example` with placeholder keys
+
+## Config Layer
+
+- **Config file:** `~/.myclaw/myclaw.json` (JSON5 format)
+- **Entry point:** `import { loadConfig } from './config/index.js'` → returns `{ config: MyClawConfig, path: string }`
+- **Env overrides:** `MYCLAW_STATE_DIR`, `MYCLAW_CONFIG_PATH`, `MYCLAW_GATEWAY_PORT`, `MYCLAW_HOME`
+- **Auth profiles:** `config.provider.authProfiles[]` — array of `{ id, apiKey }` for failover rotation
+- **Schemas are `.strict()`** — unknown keys are rejected at parse time
+- **Defaults are immutable** — each `apply*Defaults()` returns a new object, never mutates
+- **Scaffold:** `scaffoldConfigIfMissing()` creates a starter config if none exists
 
 ## Conventions
 
