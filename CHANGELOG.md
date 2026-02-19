@@ -7,3 +7,4 @@ All notable changes to this project will be documented here.
 ## [Unreleased]
 
 - `feat(config):` implement config layer with JSON5 loading, Zod validation, env substitution, and auth profiles.
+- `feat(sessions):` implement session store — deterministic session key builder, JSONL transcript append/load, and JSON metadata index with mtime-based cache and prune support.

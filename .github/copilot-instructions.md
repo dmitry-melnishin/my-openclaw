@@ -37,10 +37,18 @@ src/
 │   ├── defaults.ts            — Immutable defaults chain: gateway → agent → logging
 │   ├── env-substitution.ts    — ${VAR} substitution, $${VAR} escape, MissingEnvVarError
 │   └── index.ts               — Barrel re-export
+├── sessions/                  — Session store (Sprint 1.2 ✅)
+│   ├── session-key.ts         — buildSessionKey() / parseSessionKey() / sessionKeyToSlug()
+│   ├── transcript.ts          — appendMessage() / loadTranscript() — JSONL file per session
+│   ├── store.ts               — updateSessionMeta() / loadSessionStore() — sessions.json index
+│   └── index.ts               — Barrel re-export
 dist/                          — build output (gitignored)
+docs/                          — architecture notes
+│   ├── config.md
+│   └── sessions.md
 ```
 
-- **Co-located tests:** place test files next to source as `*.test.ts` (they are excluded from `tsconfig` compilation but picked up by Vitest)
+- **Co-located tests:** place test files next to source as `*.test.ts`
 - **Environment variables:** use `.env` files (gitignored); commit `.env.example` with placeholder keys
 
 ## Config Layer
@@ -52,6 +60,21 @@ dist/                          — build output (gitignored)
 - **Schemas are `.strict()`** — unknown keys are rejected at parse time
 - **Defaults are immutable** — each `apply*Defaults()` returns a new object, never mutates
 - **Scaffold:** `scaffoldConfigIfMissing()` creates a starter config if none exists
+
+## Session Layer
+
+- **Session key format:** `agent:<agentId>:channel:<channel>:account:<accountId>:peer:<peerKind>:<peerId>`
+  - `peerKind`: `"direct"` | `"group"` | `"channel"`
+  - Segments are normalised (lowercase, whitespace→underscore, unsafe chars stripped, max 128 chars)
+- **Transcript:** one `.jsonl` file per session at `~/.myclaw/sessions/<slug>.jsonl`
+  - Line 1 is a session header (`{"type":"session",...}`); subsequent lines are messages
+  - `appendMessage(sessionKey, { role, content, ts? })` — create-if-missing + append
+  - `loadTranscript(sessionKey)` — returns `TranscriptMessage[]`, skips header and malformed lines
+- **Metadata index:** single `~/.myclaw/sessions/sessions.json` — `Record<sessionKey, SessionEntry>`
+  - `updateSessionMeta(sessionKey, patch)` — upsert with generated UUID on first create
+  - `loadSessionStore()` — mtime-based in-memory cache; returns a `structuredClone` to prevent cache poisoning
+  - `pruneSessions(maxAgeMs)` — remove stale entries
+- **Entry point:** `import { buildSessionKey, appendMessage, loadTranscript, updateSessionMeta } from './sessions/index.js'`
 
 ## Conventions
 
