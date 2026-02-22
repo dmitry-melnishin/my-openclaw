@@ -42,10 +42,25 @@ src/
 │   ├── transcript.ts          — appendMessage() / loadTranscript() — JSONL file per session
 │   ├── store.ts               — updateSessionMeta() / loadSessionStore() — sessions.json index
 │   └── index.ts               — Barrel re-export
+├── agent/                     — Agent engine (Sprint 1.3 ✅)
+│   ├── run.ts                 — Main run loop: LLM call → tool exec → retry/failover → streaming
+│   ├── streaming.ts           — streamLLM() + callLLM() wrappers around Pi SDK streamSimple/completeSimple
+│   ├── system-prompt.ts       — Compose system prompt from identity + bootstrap files + tools + runtime
+│   ├── bootstrap-files.ts     — Load AGENTS.md, SOUL.md, USER.md, etc. from workspace
+│   ├── context-guard.ts       — Context overflow detection, message compaction, tool result truncation
+│   ├── failover.ts            — Error classification (auth/rate_limit/billing/timeout) + profile rotation
+│   ├── workspace.ts           — Ensure workspace dir exists + seed default files
+│   ├── types.ts               — Pi SDK re-exports + MyClaw types (RunResult, FailoverReason, helpers)
+│   ├── tools/
+│   │   ├── index.ts           — createTools(workspace) → Pi SDK coding tools + apply_patch
+│   │   └── apply-patch.ts     — Custom unified diff tool (not in Pi SDK)
+│   ├── cli-test.ts            — CLI REPL for testing the agent
+│   └── index.ts               — Barrel re-export
 dist/                          — build output (gitignored)
 docs/                          — architecture notes
 │   ├── config.md
-│   └── sessions.md
+│   ├── sessions.md
+│   └── agent.md
 ```
 
 - **Co-located tests:** place test files next to source as `*.test.ts`
@@ -75,6 +90,22 @@ docs/                          — architecture notes
   - `loadSessionStore()` — mtime-based in-memory cache; returns a `structuredClone` to prevent cache poisoning
   - `pruneSessions(maxAgeMs)` — remove stale entries
 - **Entry point:** `import { buildSessionKey, appendMessage, loadTranscript, updateSessionMeta } from './sessions/index.js'`
+
+## Agent Engine
+
+- **Pi SDK packages:** `@mariozechner/pi-ai` (streaming, models, types), `pi-agent-core` (AgentTool interface), `pi-coding-agent` (createCodingTools) — all v0.54.0
+- **Workspace:** `~/.myclaw/workspace/` (override via `config.agent.workspaceDir`) — auto-created with starter `AGENTS.md`
+- **Tools:** 5 total — `read`, `write`, `edit`, `bash` from Pi SDK's `createCodingTools(workspace)` + custom `apply_patch`
+  - Tool names are Pi SDK names (not `read_file`/`write_file`/`edit_file`)
+  - `read` uses `offset`/`limit`; `edit` uses `oldText`/`newText`
+- **Streaming:** `streamLLM(params, onEvent)` uses Pi SDK `streamSimple()` for real-time `text_delta` events; `callLLM(params)` uses `completeSimple()` for buffered responses
+  - `RunAgentParams.onEvent?: StreamCallback` — when provided, agent streams; when omitted, buffers
+- **Message types:** Pi SDK discriminated union `Message = UserMessage | AssistantMessage | ToolResultMessage` — no flat `{role, content}`, no `system` role
+  - Helpers: `getAssistantText(msg)`, `getToolCalls(msg)`, `emptyUsage()`, `addUsage()`
+- **Error recovery:** auth profile rotation on 401/402/429 errors; context overflow auto-compaction (summarise old messages, keep recent 10)
+- **System prompt:** identity + bootstrap files (AGENTS.md, SOUL.md, etc.) + tool instructions + runtime context (OS, CWD, date)
+- **Entry point:** `import { runAgent, streamLLM, callLLM } from './agent/index.js'`
+- **CLI test:** `npx tsx src/agent/cli-test.ts "message"` or interactive mode (no args)
 
 ## Conventions
 
