@@ -10,7 +10,14 @@
  * and runs the agent with the given message.
  *
  * Set MYCLAW_DEBUG=1 for verbose streaming output.
+ * Set MYCLAW_NO_STREAM=1 to disable streaming.
+ *
+ * API keys are read from a .env file in the project root (if present),
+ * then from the process environment.
  */
+
+// Load .env file if present (Node 22 built-in — no dotenv needed)
+try { process.loadEnvFile(); } catch { /* .env not found — rely on shell env */ }
 
 import readline from "node:readline";
 
